@@ -7,7 +7,7 @@ CELL_SIZE = 28
 class App:
     def __init__(self, root):
         self.root = root
-        self.root.title("Module 3 - Dynamic Mode (Re-planning)")
+        self.root.title("Module 4 - Final Visuals (Frontier + Dynamic)")
         self.root.minsize(1100, 700)
 
         self.rows = 15
@@ -19,9 +19,11 @@ class App:
 
         # search / animation
         self.visited_set = set()
+        self.frontier_set = set()
         self.path_list = []
         self.path_set = set()
-        self.full_visited = []
+
+        self.full_steps = []
         self.anim_i = 0
         self.anim_running = False
 
@@ -32,7 +34,7 @@ class App:
         self.dynamic_on = tk.IntVar()
         self.dynamic_on.set(0)
         self.spawn_var = tk.IntVar()
-        self.spawn_var.set(5)  # percent
+        self.spawn_var.set(5)
         self.agent = None
         self.move_i = 0
         self.moving = False
@@ -47,7 +49,6 @@ class App:
         self.left = tk.Frame(self.main, bg="#dddddd")
         self.left.pack(side="left", fill="both", expand=True, padx=10, pady=10)
 
-        # wider right side
         self.right = tk.Frame(self.main, bg="#eeeeee", width=430)
         self.right.pack(side="right", fill="y", padx=10, pady=10)
         self.right.pack_propagate(False)
@@ -71,7 +72,6 @@ class App:
             yscrollcommand=self.ybar.set
         )
         self.canvas.pack(side="left", fill="both", expand=True)
-
         self.xbar.config(command=self.canvas.xview)
         self.ybar.config(command=self.canvas.yview)
 
@@ -81,52 +81,27 @@ class App:
         self.side_canvas = tk.Canvas(self.right, bg="#eeeeee", highlightthickness=0)
         self.side_scroll = tk.Scrollbar(self.right, orient="vertical", command=self.side_canvas.yview)
         self.side_canvas.configure(yscrollcommand=self.side_scroll.set)
-
         self.side_scroll.pack(side="right", fill="y")
         self.side_canvas.pack(side="left", fill="both", expand=True)
 
         self.side_frame = tk.Frame(self.side_canvas, bg="#eeeeee")
         self.side_win = self.side_canvas.create_window((0, 0), window=self.side_frame, anchor="nw")
-
-        # update scroll region when sidebar content changes
         self.side_frame.bind("<Configure>", self.update_side_scroll)
         self.side_canvas.bind("<Configure>", self.side_fit_width)
 
-        # optional: mouse wheel scroll sidebar
-        self.side_canvas.bind_all("<MouseWheel>", self.side_mousewheel)
-
-        # now build sidebar controls inside side_frame
         self.build_sidebar()
-
-        # make first grid
         self.make_grid()
 
-    # ---------- sidebar scroll helpers ----------
     def update_side_scroll(self, e=None):
         self.side_canvas.configure(scrollregion=self.side_canvas.bbox("all"))
 
     def side_fit_width(self, e):
-        # keep the inner frame same width as canvas so text/buttons don't get cut
         self.side_canvas.itemconfig(self.side_win, width=e.width)
 
-    def side_mousewheel(self, e):
-        # scroll only if mouse is over right side area
-        try:
-            x = self.root.winfo_pointerx() - self.right.winfo_rootx()
-            y = self.root.winfo_pointery() - self.right.winfo_rooty()
-            if 0 <= x <= self.right.winfo_width() and 0 <= y <= self.right.winfo_height():
-                self.side_canvas.yview_scroll(int(-1 * (e.delta / 120)), "units")
-        except:
-            pass
-
-    # ---------- build sidebar controls ----------
     def build_sidebar(self):
         f = self.side_frame
+        tk.Label(f, text="Controls", bg="#eeeeee", font=("Arial", 15, "bold")).pack(pady=(10, 10))
 
-        tk.Label(f, text="Controls", bg="#eeeeee",
-                 font=("Arial", 15, "bold")).pack(pady=(10, 10))
-
-        # rows / cols
         box_size = tk.Frame(f, bg="#eeeeee")
         box_size.pack(fill="x", padx=10, pady=6)
 
@@ -146,7 +121,6 @@ class App:
 
         tk.Button(f, text="Make Grid", command=self.make_grid).pack(fill="x", padx=10, pady=6)
 
-        # density
         box_den = tk.Frame(f, bg="#eeeeee")
         box_den.pack(fill="x", padx=10, pady=6)
         tk.Label(box_den, text="Density (0-1):", bg="#eeeeee").pack(side="left")
@@ -156,9 +130,7 @@ class App:
 
         tk.Button(f, text="Random Walls", command=self.random_walls).pack(fill="x", padx=10, pady=6)
 
-        # search selects
-        tk.Label(f, text="Search", bg="#eeeeee",
-                 font=("Arial", 12, "bold")).pack(pady=(16, 6))
+        tk.Label(f, text="Search", bg="#eeeeee", font=("Arial", 12, "bold")).pack(pady=(16, 6))
 
         self.alg_var = tk.StringVar()
         self.alg_var.set("A*")
@@ -172,17 +144,11 @@ class App:
         tk.Scale(f, from_=0, to=300, orient="horizontal",
                  variable=self.delay_var, bg="#eeeeee", highlightthickness=0).pack(fill="x", padx=10)
 
-        # dynamic mode
-        tk.Label(f, text="Dynamic Mode", bg="#eeeeee",
-                 font=("Arial", 12, "bold")).pack(pady=(14, 6))
+        tk.Label(f, text="Dynamic Mode", bg="#eeeeee", font=("Arial", 12, "bold")).pack(pady=(14, 6))
 
         tk.Checkbutton(
-            f,
-            text="Enable Dynamic Obstacles",
-            variable=self.dynamic_on,
-            bg="#eeeeee",
-            anchor="w",
-            wraplength=360
+            f, text="Enable Dynamic Obstacles",
+            variable=self.dynamic_on, bg="#eeeeee", anchor="w", wraplength=360
         ).pack(fill="x", padx=10)
 
         tk.Label(f, text="Spawn Chance (% per move)", bg="#eeeeee").pack(pady=(6, 0))
@@ -195,28 +161,20 @@ class App:
         self.btn_move = tk.Button(f, text="Start Moving Agent", command=self.start_agent_move)
         self.btn_move.pack(fill="x", padx=10, pady=6)
 
-        # edit mode
-        tk.Label(f, text="Edit Mode", bg="#eeeeee",
-                 font=("Arial", 12, "bold")).pack(pady=(12, 6))
+        tk.Label(f, text="Edit Mode", bg="#eeeeee", font=("Arial", 12, "bold")).pack(pady=(12, 6))
         tk.Button(f, text="Place Start", command=self.mode_start).pack(fill="x", padx=10, pady=4)
         tk.Button(f, text="Place Goal", command=self.mode_goal).pack(fill="x", padx=10, pady=4)
         tk.Button(f, text="Toggle Wall", command=self.mode_wall).pack(fill="x", padx=10, pady=4)
 
-        # clear
-        tk.Label(f, text="Clear", bg="#eeeeee",
-                 font=("Arial", 12, "bold")).pack(pady=(12, 6))
+        tk.Label(f, text="Clear", bg="#eeeeee", font=("Arial", 12, "bold")).pack(pady=(12, 6))
         tk.Button(f, text="Clear Walls", command=self.clear_walls).pack(fill="x", padx=10, pady=4)
         tk.Button(f, text="Clear All", command=self.clear_all).pack(fill="x", padx=10, pady=4)
         tk.Button(f, text="Clear Search Colors", command=self.clear_search).pack(fill="x", padx=10, pady=4)
 
-        self.lbl = tk.Label(f, text="Mode: WALL", bg="#eeeeee",
-                            fg="#333333", font=("Arial", 11))
+        self.lbl = tk.Label(f, text="Mode: WALL", bg="#eeeeee", fg="#333333", font=("Arial", 11))
         self.lbl.pack(pady=(10, 6))
 
-        # metrics
-        tk.Label(f, text="Metrics", bg="#eeeeee",
-                 font=("Arial", 12, "bold")).pack(pady=(10, 6))
-
+        tk.Label(f, text="Metrics", bg="#eeeeee", font=("Arial", 12, "bold")).pack(pady=(10, 6))
         self.lbl_nodes = tk.Label(f, text="Nodes Visited: 0", bg="#eeeeee")
         self.lbl_nodes.pack(anchor="w", padx=10)
         self.lbl_cost = tk.Label(f, text="Path Cost: 0", bg="#eeeeee")
@@ -224,21 +182,20 @@ class App:
         self.lbl_time = tk.Label(f, text="Time (ms): 0", bg="#eeeeee")
         self.lbl_time.pack(anchor="w", padx=10)
 
+        self.lbl_status = tk.Label(f, text="Status: Ready", bg="#eeeeee", fg="#444444")
+        self.lbl_status.pack(anchor="w", padx=10, pady=(8, 10))
+
         tip = (
             "Colors:\n"
+            "- Frontier: Yellow\n"
             "- Visited: Blue\n"
             "- Path: Green\n"
             "- Agent: Orange\n"
-            "- Start: Green\n"
-            "- Goal: Red\n"
-            "- Walls: Black\n\n"
-            "Left side:\n"
-            "- Use scrollbars to move around\n"
+            "- Walls: Black"
         )
-        tk.Label(f, text=tip, bg="#eeeeee", justify="left",
-                 fg="#444444").pack(padx=10, pady=(10, 10), anchor="w")
+        tk.Label(f, text=tip, bg="#eeeeee", justify="left", fg="#444444").pack(padx=10, pady=(0, 10), anchor="w")
 
-    # ---------------- modes ----------------
+    # ---------- modes ----------
     def mode_wall(self):
         self.mode = "wall"
         self.lbl.config(text="Mode: WALL")
@@ -251,7 +208,7 @@ class App:
         self.mode = "goal"
         self.lbl.config(text="Mode: GOAL")
 
-    # ---------------- grid ----------------
+    # ---------- grid ----------
     def make_grid(self):
         if self.anim_running or self.moving:
             return
@@ -282,15 +239,9 @@ class App:
         self.clear_search()
         self.draw_grid()
 
-        # set scroll area to full grid size
-        w = self.cols * CELL_SIZE
-        h = self.rows * CELL_SIZE
-        self.canvas.configure(scrollregion=(0, 0, w, h))
-
     def draw_grid(self):
         self.canvas.delete("all")
         self.rects = []
-
         for r in range(self.rows):
             one_row = []
             for c in range(self.cols):
@@ -299,8 +250,7 @@ class App:
                 x2 = x1 + CELL_SIZE
                 y2 = y1 + CELL_SIZE
                 color = self.get_cell_color(r, c)
-                box = self.canvas.create_rectangle(x1, y1, x2, y2,
-                                                   fill=color, outline="#bbbbbb")
+                box = self.canvas.create_rectangle(x1, y1, x2, y2, fill=color, outline="#bbbbbb")
                 one_row.append(box)
             self.rects.append(one_row)
 
@@ -322,6 +272,8 @@ class App:
             return "#00cc66"
         if pos in self.visited_set:
             return "#66a3ff"
+        if pos in self.frontier_set:
+            return "#ffdd55"
         return "white"
 
     def recolor(self, r, c):
@@ -331,12 +283,10 @@ class App:
         if self.anim_running or self.moving:
             return
 
-        # convert mouse to canvas coords (works with scrollbars)
         x = int(self.canvas.canvasx(e.x))
         y = int(self.canvas.canvasy(e.y))
         c = x // CELL_SIZE
         r = y // CELL_SIZE
-
         if r < 0 or r >= self.rows or c < 0 or c >= self.cols:
             return
 
@@ -405,14 +355,15 @@ class App:
         self.clear_search()
         self.draw_grid()
 
-    # ---------------- search ----------------
+    # ---------- search ----------
     def clear_search(self):
         if self.anim_running or self.moving:
             return
         self.visited_set = set()
+        self.frontier_set = set()
         self.path_list = []
         self.path_set = set()
-        self.full_visited = []
+        self.full_steps = []
         self.anim_i = 0
         self.agent = self.start
         self.move_i = 0
@@ -420,19 +371,25 @@ class App:
         self.lbl_nodes.config(text="Nodes Visited: 0")
         self.lbl_cost.config(text="Path Cost: 0")
         self.lbl_time.config(text="Time (ms): 0")
+        self.lbl_status.config(text="Status: Ready")
 
     def run_search(self):
         if self.anim_running or self.moving:
             return
 
         self.visited_set = set()
+        self.frontier_set = set()
         self.path_set = set()
-        self.full_visited = []
+        self.full_steps = []
         self.anim_i = 0
+
+        self.lbl_nodes.config(text="Nodes Visited: 0")
+        self.lbl_cost.config(text="Path Cost: 0")
+        self.lbl_time.config(text="Time (ms): 0")
+        self.lbl_status.config(text="Status: Searching...")
 
         alg = self.alg_var.get()
         hname = self.h_var.get()
-
         cur_start = self.start if self.agent is None else self.agent
 
         if alg == "GBFS":
@@ -440,10 +397,10 @@ class App:
         else:
             res = astar(self.grid, cur_start, self.goal, hname)
 
-        self.full_visited = res["visited"]
-        self.path_list = res["path"]
-        self.last_cost = res["cost"]
-        self.last_time = res["time_ms"]
+        self.full_steps = res.get("steps", [])
+        self.path_list = res.get("path", [])
+        self.last_cost = res.get("cost", 0)
+        self.last_time = res.get("time_ms", 0)
 
         self.anim_running = True
         self.btn_run.config(state="disabled")
@@ -455,14 +412,28 @@ class App:
         if not self.anim_running:
             return
 
-        if self.anim_i < len(self.full_visited):
-            node = self.full_visited[self.anim_i]
+        if self.anim_i < len(self.full_steps):
+            step = self.full_steps[self.anim_i]
             self.anim_i += 1
+
+            node = step["expanded"]
+            new_frontier = set(step["frontier"])
+
+            # recolor old frontier cells (they may turn white/visited)
+            old_front = self.frontier_set
+            self.frontier_set = new_frontier
+
+            # mark expanded as visited
             self.visited_set.add(node)
 
-            r, c = node
-            if 0 <= r < self.rows and 0 <= c < self.cols:
-                self.recolor(r, c)
+            # recolor changed frontier + visited node
+            all_change = old_front.union(new_frontier)
+            all_change.add(node)
+
+            for p in all_change:
+                r, c = p
+                if 0 <= r < self.rows and 0 <= c < self.cols:
+                    self.recolor(r, c)
 
             self.lbl_nodes.config(text="Nodes Visited: " + str(len(self.visited_set)))
 
@@ -471,26 +442,30 @@ class App:
             self.root.after(d, self.animate_search)
             return
 
-        # show path
+        # finish: show final path
+        self.frontier_set = set()
         self.path_set = set(self.path_list)
+
         for p in self.path_list:
             self.recolor(p[0], p[1])
 
         if self.path_list:
             self.lbl_cost.config(text="Path Cost: " + str(self.last_cost))
+            self.lbl_status.config(text="Status: Done (Path Found)")
         else:
             self.lbl_cost.config(text="Path Cost: No Path")
+            self.lbl_status.config(text="Status: Done (No Path)")
+
         self.lbl_time.config(text="Time (ms): " + str(self.last_time))
 
         self.anim_running = False
         self.btn_run.config(state="normal")
         self.btn_move.config(state="normal")
 
-    # ---------------- dynamic move + replanning ----------------
+    # ---------- dynamic move ----------
     def start_agent_move(self):
         if self.anim_running or self.moving:
             return
-
         if self.agent is None:
             self.agent = self.start
 
@@ -498,12 +473,14 @@ class App:
             self.compute_path_no_anim()
 
         if not self.path_list:
+            self.lbl_status.config(text="Status: No path to move")
             return
 
         self.moving = True
         self.btn_run.config(state="disabled")
         self.btn_move.config(state="disabled")
         self.move_i = 0
+        self.lbl_status.config(text="Status: Moving...")
         self.move_step()
 
     def compute_path_no_anim(self):
@@ -516,14 +493,13 @@ class App:
         else:
             res = astar(self.grid, cur_start, self.goal, hname)
 
-        self.path_list = res["path"]
+        self.path_list = res.get("path", [])
         self.path_set = set(self.path_list)
-        self.last_cost = res["cost"]
-        self.last_time = res["time_ms"]
+        self.last_cost = res.get("cost", 0)
+        self.last_time = res.get("time_ms", 0)
 
         self.lbl_cost.config(text="Path Cost: " + (str(self.last_cost) if self.path_list else "No Path"))
         self.lbl_time.config(text="Time (ms): " + str(self.last_time))
-
         self.draw_grid()
 
     def spawn_obstacle(self):
@@ -548,7 +524,6 @@ class App:
             self.grid[r][c] = 1
             self.recolor(r, c)
             return pos
-
         return None
 
     def move_step(self):
@@ -559,6 +534,7 @@ class App:
             self.moving = False
             self.btn_run.config(state="normal")
             self.btn_move.config(state="normal")
+            self.lbl_status.config(text="Status: Reached Goal")
             return
 
         new_wall = None
@@ -568,15 +544,18 @@ class App:
         if new_wall is not None:
             rem = self.path_list[self.move_i+1:] if self.move_i+1 < len(self.path_list) else []
             if new_wall in rem:
+                self.lbl_status.config(text="Status: Replanning...")
                 self.path_set = set()
                 self.draw_grid()
                 self.compute_path_no_anim()
                 self.move_i = 0
+                self.lbl_status.config(text="Status: Moving...")
 
         if not self.path_list or len(self.path_list) < 2:
             self.moving = False
             self.btn_run.config(state="normal")
             self.btn_move.config(state="normal")
+            self.lbl_status.config(text="Status: Stopped (No Path)")
             return
 
         if self.move_i >= len(self.path_list) or self.path_list[self.move_i] != self.agent:
